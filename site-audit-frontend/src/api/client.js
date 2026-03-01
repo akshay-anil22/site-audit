@@ -1,4 +1,3 @@
-// src/api/client.js
 const BASE_URL = 'http://localhost:3000/api';
 
 export const sitesApi = {
@@ -19,6 +18,24 @@ export const sitesApi = {
     if (!response.ok) throw new Error('Failed to add site');
     return response.json();
   },
+  addSite: async (siteData) => {
+    const response = await fetch(`${BASE_URL}/sites`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(siteData),
+    });
+    if (!response.ok) throw new Error('Failed to add site');
+    return response.json();
+  }, // <--- Make sure this comma is here
+
+  // Delete a site
+  deleteSite: async (siteId) => {
+    const response = await fetch(`${BASE_URL}/sites/${siteId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete site');
+    return response.json();
+  },
 
   // Start a crawl for a specific site
   startCrawl: async (siteId) => {
@@ -28,6 +45,28 @@ export const sitesApi = {
       body: JSON.stringify({ siteId }),
     });
     if (!response.ok) throw new Error('Failed to start crawl');
+    return response.json();
+  }, 
+
+  stopCrawl: async (crawlId) => {
+    const response = await fetch(`${BASE_URL}/crawls/${crawlId}/stop`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to stop crawl');
+    return response.json();
+  },
+
+  // Get details for a specific crawl
+  getCrawlDetails: async (crawlId) => {
+    const response = await fetch(`${BASE_URL}/crawls/${crawlId}`);
+    if (!response.ok) throw new Error('Failed to fetch crawl details');
+    return response.json();
+  },
+
+  // Get issues found during a specific crawl
+  getCrawlIssues: async (crawlId) => {
+    const response = await fetch(`${BASE_URL}/crawls/${crawlId}/issues?limit=500`);
+    if (!response.ok) throw new Error('Failed to fetch crawl issues');
     return response.json();
   }
 };

@@ -107,36 +107,59 @@ export async function simulateCrawl(siteId, crawlId) {
   ];
 
   for (const stage of stages) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 🛑 CRITICAL: Check if the user ran stopCrawl() BEFORE waiting
+    if (crawl.status === 'stopped') {
+      console.log('Crawl aborted by user.');
+      break; 
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // 🛑 CRITICAL: Check if the user ran stopCrawl() DURING the 1-second wait
+    if (crawl.status === 'stopped') {
+      console.log('Crawl aborted by user.');
+      break;
+    }
 
     crawl.progress = stage.progress;
     crawl.status = stage.status;
     crawl.currentMessage = stage.message;
+    site.status = stage.status; 
+  }
 
-    if (stage.status === 'completed') {
-      crawl.completedAt = new Date().toISOString();
-      crawl.duration = Math.round((new Date(crawl.completedAt) - new Date(crawl.startedAt)) / 1000);
+  // If the loop finished naturally (was not stopped)
+  if (crawl.status === 'completed') {
+    crawl.completedAt = new Date().toISOString();
 
-      const issues = generateRandomIssues(siteId, crawlId, crawl.urlsCrawled);
-      storage.issues.push(...issues);
+    // 1. Generate a realistic URL count first (needed for issue generation)
+    const urlsCrawled = Math.floor(Math.random() * 800) + 200;
 
-      crawl.totalIssues = issues.length;
-      crawl.errorsCount = issues.filter(i => i.severity === 'error').reduce((sum, i) => sum + i.count, 0);
-      crawl.warningsCount = issues.filter(i => i.severity === 'warning').reduce((sum, i) => sum + i.count, 0);
-      crawl.noticesCount = issues.filter(i => i.severity === 'notice').reduce((sum, i) => sum + i.count, 0);
+    // 2. Generate issues upon completion and store them
+    const newIssues = generateRandomIssues(siteId, crawlId, urlsCrawled);
+    storage.issues.push(...newIssues);
 
-      crawl.healthScore = calculateHealthScore(issues);
+    // 3. Count exactly how many ERRORS were actually generated
+    const actualErrorsCount = newIssues
+      .filter(i => i.severity === 'error')
+      .reduce((sum, i) => sum + (i.count || 0), 0);
 
-      site.lastCrawl = crawl.startedAt;
-      site.status = 'completed';
-      site.healthScore = crawl.healthScore;
-      site.urlsCrawled = crawl.urlsCrawled;
-      site.errorsCount = crawl.errorsCount;
-      site.warningsCount = crawl.warningsCount;
-      site.noticesCount = crawl.noticesCount;
-    }
+    // 4. Calculate the REAL Health Score
+    const calculatedHealthScore = Math.max(100 - Math.floor((actualErrorsCount / urlsCrawled) * 100), 0);
+
+    // 5. Sync these numbers to BOTH the Crawl and the Site
+    crawl.urlsCrawled = urlsCrawled;
+    crawl.errorsCount = actualErrorsCount;
+    crawl.healthScore = calculatedHealthScore;
+
+    site.urlsCrawled = urlsCrawled;
+    site.errorsCount = actualErrorsCount;
+    site.healthScore = calculatedHealthScore;
+    site.lastCrawl = crawl.completedAt;
+    site.latestCrawlId = crawl.id;
   }
 }
+
+
 
 /**
  * Add a new site
@@ -211,9 +234,18 @@ export function startCrawl(siteId) {
  * Get crawl details
  */
 export function getCrawlDetails(crawlId) {
-  const crawl = storage.crawls.find(c => c.id === crawlId);
+  let crawl = storage.crawls.find(c => c.id === crawlId);
+  
   if (!crawl) {
-    throw new Error('Crawl not found');
+    const siteCrawls = storage.crawls
+      .filter(c => c.siteId === id)
+      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    crawl = siteCrawls[0];
+  }
+
+  if (!crawl) {
+    // Return empty fallback structure instead of crashing if no crawl exists yet
+    return { healthScore: 0, urlsCrawled: 0, issues: [] }; 
   }
 
   const issues = storage.issues.filter(i => i.crawlId === crawlId);
@@ -329,17 +361,26 @@ export function updateSiteSettings(siteId, settings) {
 /**
  * Stop crawl
  */
-export function stopCrawl(crawlId) {
-  const crawl = storage.crawls.find(c => c.id === crawlId);
+
+
+// ✨ SMART STOP FUNCTION: Accepts either a Crawl ID or a Site ID!
+export function stopCrawl(id) {
+  // Try to find the crawl directly by its ID, OR find the actively running crawl for the given Site ID
+  const crawl = storage.crawls.find(c => 
+    c.id === id || (c.siteId === id && c.status === 'crawling')
+  );
+
   if (!crawl) {
-    throw new Error('Crawl not found');
+    throw new Error('Active crawl not found');
   }
 
   if (crawl.status === 'crawling') {
+    // 1. Stop the crawl
     crawl.status = 'stopped';
     crawl.completedAt = new Date().toISOString();
     crawl.currentMessage = 'Crawl stopped by user';
 
+    // 2. Stop the site so the Dashboard updates instantly
     const site = storage.sites.find(s => s.id === crawl.siteId);
     if (site) {
       site.status = 'stopped';
@@ -348,12 +389,25 @@ export function stopCrawl(crawlId) {
 
   return crawl;
 }
-
 /**
- * Get issues for a crawl with filtering
+ * Get issues for a crawl with filtering (Smart: Accepts either Crawl ID or Site ID)
  */
-export function getIssuesForCrawl(crawlId, filters = {}) {
-  let issues = storage.issues.filter(i => i.crawlId === crawlId);
+export function getIssuesForCrawl(id, filters = {}) {
+  let targetCrawlId = id;
+  
+  // Check if the ID provided is actually a Site ID
+  const isSiteId = storage.sites.some(s => s.id === id);
+  if (isSiteId) {
+    const siteCrawls = storage.crawls
+      .filter(c => c.siteId === id)
+      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    if (siteCrawls.length > 0) {
+      targetCrawlId = siteCrawls[0].id;
+    }
+  }
+
+  // Now filter the issues using the correct Crawl ID
+  let issues = storage.issues.filter(i => i.crawlId === targetCrawlId);
 
   if (filters.severity) {
     issues = issues.filter(i => i.severity === filters.severity);

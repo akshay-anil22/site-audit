@@ -9,35 +9,23 @@ import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel } f
 import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from '../components/catalyst-ui/dialog';
 import { Field, Label } from '../components/catalyst-ui/fieldset';
 
+import { HealthScoreCircle } from '../components/catalyst-ui/healthScoreCircle';
+
 const HealthScoreRing = ({ score, status }) => {
-  // Updated to match backend status strings
-  if (status === 'not_crawled' || status === 'failed') {
-    return (
-      <div className="flex flex-col items-center justify-center">
-        <div className="relative size-[52px] flex items-center justify-center rounded-full border-[4px] border-gray-100"></div>
-        <span className="text-[13px] text-gray-500 font-semibold mt-2">0</span>
-      </div>
-    );
-  }
+  const isPending = status === 'not_crawled' || status === 'failed';
+  const displayScore = isPending ? 0 : score;
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="relative size-[52px]">
-        <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="20" fill="none" stroke="#F3F4F6" strokeWidth="4" />
-        </svg>
-        <div 
-          className="absolute inset-0 size-full rounded-full"
-          style={{
-            background: 'conic-gradient(from 180deg, #EF4444 0%, #F59E0B 50%, #22C55E 100%)',
-            WebkitMaskImage: 'radial-gradient(transparent 54%, black 55%)',
-            maskImage: 'radial-gradient(transparent 54%, black 55%)',
-            clipPath: `polygon(0 0, 100% 0, 100% ${score >= 50 ? '100%' : '50%'}, 0 ${score >= 50 ? '100%' : '50%'})`
-          }}
-        />
-        <div className="absolute inset-[4px] bg-white rounded-full"></div>
-      </div>
-      <span className="text-[13px] font-bold text-gray-700 mt-2">{score}</span>
+      <HealthScoreCircle 
+        score={displayScore} 
+        size={52}          
+        strokeWidth={6}    
+        showLabel={false}  
+      />
+      <span className={`text-[13px] mt-2 ${isPending ? 'text-gray-500 font-semibold' : 'text-gray-700 font-bold'}`}>
+        {displayScore}
+      </span>
     </div>
   );
 };
@@ -45,43 +33,51 @@ const HealthScoreRing = ({ score, status }) => {
 export default function SitesDashboard() {
   const queryClient = useQueryClient();
   
-  // State for the Add Site modal
   const [isAddSiteOpen, setIsAddSiteOpen] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [newSiteUrl, setNewSiteUrl] = useState('');
 
-  // 1. Fetch sites data from the backend
+  // 1. Fetch sites data (Polling every second)
   const { data: response, isLoading, isError } = useQuery({
     queryKey: ['sites'],
     queryFn: sitesApi.getSites,
+    refetchInterval: 1000, 
   });
 
-  // 2. Add Site Mutation
   const addSiteMutation = useMutation({
     mutationFn: sitesApi.addSite,
     onSuccess: () => {
-      // Refresh the table data
       queryClient.invalidateQueries({ queryKey: ['sites'] });
-      // Close the modal and reset form
       setIsAddSiteOpen(false);
       setNewSiteName('');
       setNewSiteUrl('');
     },
   });
 
-  // 3. Setup mutation for starting a crawl
   const crawlMutation = useMutation({
     mutationFn: sitesApi.startCrawl,
     onSuccess: () => {
-      // Refresh the table data when a crawl starts successfully
       queryClient.invalidateQueries({ queryKey: ['sites'] });
     },
   });
 
-  // Extract the actual array of sites from the backend response
+  // ✨ NEW: Stop Crawl Mutation for the Dashboard
+  const stopCrawlMutation = useMutation({
+    mutationFn: sitesApi.stopCrawl,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: sitesApi.deleteSite,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+    },
+  });
+
   const sites = response?.data || [];
 
-  // Helper to format the ISO date from backend
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -89,12 +85,10 @@ export default function SitesDashboard() {
     });
   };
 
-  // Handle form submission
   const handleAddSiteSubmit = (e) => {
     e.preventDefault();
     if (!newSiteName || !newSiteUrl) return;
     
-    // Add default values required by the backend API
     addSiteMutation.mutate({
       name: newSiteName,
       url: newSiteUrl,
@@ -114,7 +108,7 @@ export default function SitesDashboard() {
         <div className="flex items-center justify-between">
           <div className="w-[400px]">
             <InputGroup>
-              <svg data-slot="icon" className="text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg data-slot="icon" className="text-gray-400 size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <Input type="text" placeholder="Search Sites" className="border-gray-200 shadow-sm" />
@@ -128,7 +122,6 @@ export default function SitesDashboard() {
               </svg>
               Issue Settings
             </Button>
-            {/* Open Modal on Click */}
             <Button 
               onClick={() => setIsAddSiteOpen(true)}
               className="!bg-gray-900 !text-white hover:!bg-black !shadow-sm font-semibold flex items-center gap-2"
@@ -155,25 +148,12 @@ export default function SitesDashboard() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {/* Loading State */}
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-gray-500 font-medium">
-                Loading sites from backend...
-              </TableCell>
+              <TableCell colSpan={7} className="text-center py-8 text-gray-500 font-medium">Loading sites from backend...</TableCell>
             </TableRow>
           )}
 
-          {/* Error State */}
-          {isError && (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-red-500 font-medium">
-                Failed to load sites. Ensure your backend server is running on http://localhost:3000
-              </TableCell>
-            </TableRow>
-          )}
-
-          {/* Empty State */}
           {!isLoading && !isError && sites.length === 0 && (
             <TableRow>
               <TableCell colSpan={7} className="text-center py-16 text-gray-500">
@@ -186,7 +166,6 @@ export default function SitesDashboard() {
             </TableRow>
           )}
 
-          {/* Actual Data */}
           {!isLoading && !isError && sites.map((site) => (
             <TableRow key={site.id} className="border-b border-gray-100/80 hover:bg-gray-50/50 transition-colors">
               <TableCell className="py-5">
@@ -209,14 +188,17 @@ export default function SitesDashboard() {
                 ) : site.status === 'failed' ? (
                   <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">Failed</span>
                 ) : site.status === 'crawling' ? (
-                  <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-600">Crawling...</span>
+                  <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-600 animate-pulse">Crawling...</span>
                 ) : (
                   <span className="inline-flex items-center rounded-md bg-[#ECFCCB] px-2 py-1 text-xs font-semibold text-[#4D7C0F]">Completed</span>
                 )}
               </TableCell>
 
               <TableCell>
-                <HealthScoreRing score={site.healthScore} status={site.status} />
+                <HealthScoreRing 
+                  score={site.healthScore || Math.max(100 - Math.floor(((site.errorsCount || 0) / (site.urlsCrawled || 1)) * 100), 0)} 
+                  status={site.status} 
+                />
               </TableCell>
 
               <TableCell className="text-gray-600 font-medium">
@@ -231,42 +213,43 @@ export default function SitesDashboard() {
 
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-3">
-                  {(site.status === 'completed' || site.status === 'not_crawled') && (
+                  
+                  {/* ✨ SMART BUTTON LOGIC: Crawl vs Stop */}
+                  {site.status === 'crawling' ? (
+                    <Button 
+                      onClick={() => stopCrawlMutation.mutate(site.latestCrawlId || site.id)}
+                      disabled={stopCrawlMutation.isPending && stopCrawlMutation.variables === (site.latestCrawlId || site.id)}
+                      className="!bg-red-50 !text-red-600 !border !border-red-200 hover:!bg-red-100 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <svg className="size-3" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+                      {stopCrawlMutation.isPending && stopCrawlMutation.variables === (site.latestCrawlId || site.id) ? 'Stopping...' : 'Stop'}
+                    </Button>
+                  ) : (
                     <Button 
                       onClick={() => crawlMutation.mutate(site.id)}
-                      disabled={crawlMutation.isPending}
+                      disabled={crawlMutation.isPending && crawlMutation.variables === site.id}
                       className="!bg-white !text-gray-900 !border !border-gray-200 hover:!bg-gray-50 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
                     >
                       <svg className="size-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                      {crawlMutation.isPending ? 'Starting...' : 'Crawl now'}
-                    </Button>
-                  )}
-                  {site.status === 'crawling' && (
-                    <Button className="!bg-white !text-gray-900 !border !border-gray-200 hover:!bg-gray-50 font-semibold shadow-sm flex items-center gap-2">
-                      <svg className="size-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>
-                      Stop Crawling
-                    </Button>
-                  )}
-                  {site.status === 'failed' && (
-                    <Button 
-                      onClick={() => crawlMutation.mutate(site.id)}
-                      disabled={crawlMutation.isPending}
-                      className="!bg-white !text-red-600 !border !border-gray-200 hover:!bg-gray-50 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
-                    >
-                       <svg className="size-3 text-red-500" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                      Try crawling again
+                      {crawlMutation.isPending && crawlMutation.variables === site.id ? 'Starting...' : 'Crawl now'}
                     </Button>
                   )}
                   
                   <Dropdown>
-                    <DropdownButton className="!bg-[#18181b] !text-white !border-transparent hover:!bg-black !px-1.5 py-1.5 shadow-sm rounded">
-                      <svg className="size-4" viewBox="0 0 20 20" fill="currentColor">
+                    <DropdownButton className="!bg-white !text-gray-500 !border !border-gray-200 hover:!bg-gray-50 !px-2 shadow-sm">
+                      <svg className="size-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                       </svg>
                     </DropdownButton>
                     <DropdownMenu anchor="bottom end">
-                      <DropdownItem><DropdownLabel>View details</DropdownLabel></DropdownItem>
-                      <DropdownItem><DropdownLabel className="text-red-600">Delete site</DropdownLabel></DropdownItem>
+                      <DropdownItem href={`/crawls/${site.id}`}>
+                        <DropdownLabel>View details</DropdownLabel>
+                      </DropdownItem>
+                      <DropdownItem onClick={() => deleteMutation.mutate(site.id)}>
+                        <DropdownLabel className="text-red-600">
+                          {deleteMutation.isPending && deleteMutation.variables === site.id ? 'Deleting...' : 'Delete site'}
+                        </DropdownLabel>
+                      </DropdownItem>
                     </DropdownMenu>
                   </Dropdown>
                 </div>
@@ -276,7 +259,6 @@ export default function SitesDashboard() {
         </TableBody>
       </Table>
 
-      {/* Catalyst Dialog for Adding a New Site */}
       <Dialog open={isAddSiteOpen} onClose={setIsAddSiteOpen}>
         <form onSubmit={handleAddSiteSubmit}>
           <DialogTitle>Add New Site</DialogTitle>
