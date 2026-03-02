@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sitesApi } from '../api/client';
+import { Link } from 'react-router-dom';
+
 
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from '../components/catalyst-ui/table';
 import { Button } from '../components/catalyst-ui/button';
@@ -36,8 +38,8 @@ export default function SitesDashboard() {
   const [isAddSiteOpen, setIsAddSiteOpen] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [newSiteUrl, setNewSiteUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // 1. Fetch sites data (Polling every second)
   const { data: response, isLoading, isError } = useQuery({
     queryKey: ['sites'],
     queryFn: sitesApi.getSites,
@@ -61,7 +63,6 @@ export default function SitesDashboard() {
     },
   });
 
-  // ✨ NEW: Stop Crawl Mutation for the Dashboard
   const stopCrawlMutation = useMutation({
     mutationFn: sitesApi.stopCrawl,
     onSuccess: () => {
@@ -77,6 +78,10 @@ export default function SitesDashboard() {
   });
 
   const sites = response?.data || [];
+  const filteredSites = sites.filter(site =>
+    site.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    site.url?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -102,25 +107,31 @@ export default function SitesDashboard() {
   };
 
   return (
-    <div className="px-10 py-8 max-w-[1400px] mx-auto bg-white min-h-screen">
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8 tracking-tight">Sites</h1>
-        <div className="flex items-center justify-between">
-          <div className="w-[400px]">
+    <div className="px-3 sm:px-6 lg:px-10 py-4 sm:py-8 max-w-[1400px] mx-auto bg-white min-h-screen">
+      <div className="mb-5 sm:mb-10">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-5 sm:mb-8 tracking-tight">Sites</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full sm:w-[400px]">
             <InputGroup>
               <svg data-slot="icon" className="text-gray-400 size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <Input type="text" placeholder="Search Sites" className="border-gray-200 shadow-sm" />
+              <input
+                type="text"
+                placeholder="Search Sites"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-sm text-zinc-900 placeholder:text-gray-400 bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
             </InputGroup>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-2 sm:gap-4">
             <Button className="!bg-white !text-gray-700 !border !border-gray-300 hover:!bg-gray-50 !shadow-sm font-semibold flex items-center gap-2">
               <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Issue Settings
+              <span className="hidden sm:inline">Issue Settings</span>
             </Button>
             <Button 
               onClick={() => setIsAddSiteOpen(true)}
@@ -135,7 +146,8 @@ export default function SitesDashboard() {
         </div>
       </div>
 
-      <Table className="[&_th]:text-gray-500 [&_th]:font-medium [&_th]:text-sm [&_th]:border-b [&_th]:border-gray-200 [&_th]:pb-4">
+      <div className="overflow-x-auto -mx-3 sm:-mx-6 lg:mx-0">
+      <Table className="min-w-[680px] [&_th]:text-gray-500 [&_th]:font-medium [&_th]:text-sm [&_th]:border-b [&_th]:border-gray-200 [&_th]:pb-4">
         <TableHead>
           <TableRow>
             <TableHeader>Site</TableHeader>
@@ -166,16 +178,33 @@ export default function SitesDashboard() {
             </TableRow>
           )}
 
-          {!isLoading && !isError && sites.map((site) => (
+          {!isLoading && !isError && sites.length > 0 && filteredSites.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-16 text-gray-500">
+                <p className="font-medium text-gray-900 mb-1">No sites match "{searchQuery}"</p>
+                <p className="text-sm text-gray-500">Try a different name or URL.</p>
+              </TableCell>
+            </TableRow>
+          )}
+
+          {!isLoading && !isError && filteredSites.map((site) => (
             <TableRow key={site.id} className="border-b border-gray-100/80 hover:bg-gray-50/50 transition-colors">
               <TableCell className="py-5">
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-14 bg-gray-100 rounded-md border border-gray-200 flex items-end justify-center overflow-hidden">
-                    <div className="w-10 h-8 bg-gray-300/80 rounded-t-lg"></div>
-                  </div>
+                  <img
+                    src="/dummy img.png"
+                    alt="site thumbnail"
+                    className="h-12 w-14 rounded-md border border-gray-200 object-contain bg-gray-50"
+                  />
                   <div className="flex flex-col gap-0.5">
                     <span className="font-semibold text-gray-900">{site.name}</span>
-                    <a href={site.url} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-[#3B82F6] hover:text-blue-700 underline decoration-transparent hover:decoration-blue-700 underline-offset-2">Open</a>
+                    <Link 
+                      to={`/crawls/${site.id}`} 
+                      className="text-[13px] font-semibold text-[#3B82F6] hover:text-blue-700 underline decoration-transparent hover:decoration-blue-700 underline-offset-2"
+                    >
+                      Open
+                    </Link>
+
                   </div>
                 </div>
               </TableCell>
@@ -213,16 +242,17 @@ export default function SitesDashboard() {
 
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-3">
-                  
-                  {/* ✨ SMART BUTTON LOGIC: Crawl vs Stop */}
                   {site.status === 'crawling' ? (
                     <Button 
                       onClick={() => stopCrawlMutation.mutate(site.latestCrawlId || site.id)}
                       disabled={stopCrawlMutation.isPending && stopCrawlMutation.variables === (site.latestCrawlId || site.id)}
-                      className="!bg-red-50 !text-red-600 !border !border-red-200 hover:!bg-red-100 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
+                      className="!bg-white !text-gray-700 !border !border-gray-200 hover:!bg-gray-50 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
                     >
-                      <svg className="size-3" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
-                      {stopCrawlMutation.isPending && stopCrawlMutation.variables === (site.latestCrawlId || site.id) ? 'Stopping...' : 'Stop'}
+                      <svg className="size-5" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="10" fill="#09090B"/>
+                        <path d="M15.536 8.464a1 1 0 010 1.415L13.414 12l2.122 2.121a1 1 0 11-1.415 1.415L12 13.414l-2.121 2.122a1 1 0 01-1.415-1.415L10.586 12 8.464 9.879a1 1 0 011.415-1.415L12 10.586l2.121-2.122a1 1 0 011.415 0z" fill="white"/>
+                      </svg>
+                      {stopCrawlMutation.isPending && stopCrawlMutation.variables === (site.latestCrawlId || site.id) ? 'Stopping...' : 'Stop Crawling'}
                     </Button>
                   ) : (
                     <Button 
@@ -230,7 +260,7 @@ export default function SitesDashboard() {
                       disabled={crawlMutation.isPending && crawlMutation.variables === site.id}
                       className="!bg-white !text-gray-900 !border !border-gray-200 hover:!bg-gray-50 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
                     >
-                      <svg className="size-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                      <svg className="size-6" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                       {crawlMutation.isPending && crawlMutation.variables === site.id ? 'Starting...' : 'Crawl now'}
                     </Button>
                   )}
@@ -258,6 +288,7 @@ export default function SitesDashboard() {
           ))}
         </TableBody>
       </Table>
+      </div>
 
       <Dialog open={isAddSiteOpen} onClose={setIsAddSiteOpen}>
         <form onSubmit={handleAddSiteSubmit}>

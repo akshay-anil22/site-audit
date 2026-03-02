@@ -46,9 +46,9 @@ export function SidebarLayout({ navbar, sidebar, children }) {
   let [showSidebar, setShowSidebar] = useState(false)
 
   return (
-    <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col pt-[60px]">
+    <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col">
       {/* Sidebar on desktop - Offset by 60px to sit below the TopNav */}
-      <div className="fixed top-[60px] bottom-0 left-0 w-64 max-lg:hidden border-r border-gray-200 bg-white z-0">
+      <div className="fixed top-[60px] bottom-0 left-0 w-64 max-lg:hidden border-r border-gray-200 bg-white z-0 flex flex-col overflow-hidden">
         {sidebar}
       </div>
 
@@ -73,7 +73,7 @@ export function SidebarLayout({ navbar, sidebar, children }) {
       {/* Content - Removed floating card styling to match Figma */}
       <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pl-64">
         <div className="grow bg-white">
-          <div className="mx-auto max-w-[1200px]">{children}</div>
+          <div className="w-full">{children}</div>
         </div>
       </main>
     </div>

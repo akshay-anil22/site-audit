@@ -5,8 +5,8 @@ import React, { useId } from 'react';
  */
 const HealthScoreCircle = ({ 
   score = 0, 
-  size = 100, // Exact Figma dimension
-  strokeWidth = 14, // Thick bold stroke
+  size = 100, 
+  strokeWidth = 14, 
   showLabel = true,
   className = ''
 }) => {
@@ -14,7 +14,6 @@ const HealthScoreCircle = ({
   const radius = (pixelSize - strokeWidth) / 2;
   const center = pixelSize / 2;
 
-  // Arc math
   const startAngle = 220;
   const endAngle = -40;
   const angleRange = startAngle - endAngle;
@@ -57,8 +56,6 @@ const HealthScoreCircle = ({
         className="overflow-visible"
       >
         <defs>
-          {/* userSpaceOnUse ensures the gradient is locked to the 100x100 box, 
-              so a score of 36 will naturally land in the orange zone! */}
           <linearGradient id={gradientId} x1="0" y1="0" x2={pixelSize} y2="0" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#EF4444" />
             <stop offset="50%" stopColor="#F59E0B" />
@@ -66,33 +63,31 @@ const HealthScoreCircle = ({
           </linearGradient>
         </defs>
 
-        {/* Gray Background Track */}
         <path
           d={describeArc(startAngle, endAngle)}
           fill="none"
-          stroke="#F3F4F6"
+          stroke="#F4F4F5"
           strokeWidth={strokeWidth}
-          strokeLinecap="butt" // Flat edges per Figma
+          strokeLinecap="butt" 
         />
         
-        {/* Foreground Colored Track */}
         {score > 0 && (
           <path
             d={describeArc(startAngle, scoreEndAngle)}
             fill="none"
             stroke={`url(#${gradientId})`}
             strokeWidth={strokeWidth}
-            strokeLinecap="butt" // Flat edges per Figma
+            strokeLinecap="butt" 
             className="transition-all duration-1000 ease-out"
           />
         )}
       </svg>
 
-      {/* Exact Typography from your Figma Inspector */}
+      {/* ✨ EXACT FIGMA TYPOGRAPHY APPLIED HERE ✨ */}
       {showLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center mt-1">
-          <div className="text-[25px] font-semibold text-[#71717A] leading-none">{score}</div>
-          <div className="text-[12px] font-medium text-gray-500 mt-1">{getLabel(score)}</div>
+          <div className="text-[25px] font-semibold text-[#71717A] leading-[27px]">{score}</div>
+          <div className="text-[12px] font-medium text-[#71717A] mt-0.5">{getLabel(score)}</div>
         </div>
       )}
     </div>

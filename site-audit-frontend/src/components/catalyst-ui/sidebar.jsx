@@ -9,7 +9,7 @@ export function Sidebar({ className, ...props }) {
   return (
     <nav
       {...props}
-      className={clsx(className, 'flex h-full min-h-0 flex-col bg-[#f4f4f5]')}
+      className={clsx(className, 'flex flex-1 min-h-0 flex-col bg-[#f4f4f5]')}
     />
   )
 }
@@ -32,7 +32,7 @@ export function SidebarBody({ className, ...props }) {
       {...props}
       className={clsx(
         className,
-        'flex flex-1 flex-col overflow-y-auto p-4 [&>[data-slot=section]+[data-slot=section]]:mt-8'
+        'flex flex-1 min-h-0 flex-col overflow-y-auto p-4 [&>[data-slot=section]+[data-slot=section]]:mt-8'
       )}
     />
   )
@@ -104,7 +104,7 @@ export const SidebarItem = forwardRef(function SidebarItem(
 ) {
   let classes = clsx(
     // Base
-    'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-zinc-950 sm:py-2 sm:text-sm/5',
+    'flex w-full items-center gap-3 rounded-lg px-2 py-1 text-left text-base/6 font-medium text-zinc-950 sm:py-1 sm:text-sm/5',
     // Leading icon/icon-only
     '*:data-[slot=icon]:size-6 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:fill-zinc-500 sm:*:data-[slot=icon]:size-5',
     // Trailing icon (down chevron or similar)
@@ -119,8 +119,7 @@ export const SidebarItem = forwardRef(function SidebarItem(
     'data-current:*:data-[slot=icon]:fill-[#09090B] data-current:text-[#09090B] data-current:bg-[#00000006]',
     // Dark mode
     'dark:text-white dark:*:data-[slot=icon]:fill-zinc-400',
-    'dark:data-hover:bg-white/5 dark:data-hover:*:data-[slot=icon]:fill-white',
-    'dark:data-active:bg-white/5 dark:data-active:*:data-[slot=icon]:fill-white',
+    'dark:data-active:bg-white/5',
     'dark:data-current:*:data-[slot=icon]:fill-white'
   )
 

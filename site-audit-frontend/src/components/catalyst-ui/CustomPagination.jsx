@@ -1,5 +1,4 @@
-import { ChevronLeftIcon, ChevronRightIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from '@heroicons/react/20/solid'
-import { Select } from './select'
+import { ChevronLeftIcon, ChevronRightIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 
 export default function CustomPagination({
   currentPage,
@@ -25,18 +24,23 @@ export default function CustomPagination({
       <span className="text-sm font-medium text-[#71717A] whitespace-nowrap">
         Rows per page:
       </span>
-      <Select
-        value={pageSize}
-        onChange={(e) => {
-          onPageSizeChange?.(Number(e.target.value))
-          onPageChange?.(1)
-        }}
-        className=" !w-20"
-      >
-        {pageSizeOptions.map(option => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </Select>
+      <div className="relative">
+        <select
+          value={pageSize}
+          onChange={(e) => {
+            onPageSizeChange?.(Number(e.target.value))
+            onPageChange?.(1)
+          }}
+          className="appearance-none h-9 w-[78px] pl-3 pr-7 text-sm font-medium text-[#09090B] bg-white border border-[#E4E4E7] rounded-md focus:outline-none focus:ring-1 focus:ring-[#09090B] cursor-pointer hover:bg-[#F4F4F5] transition-colors"
+        >
+          {pageSizeOptions.map(option => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-[#71717A]">
+          <ChevronUpDownIcon className="w-4 h-4" />
+        </div>
+      </div>
     </div>
   ) : null
 
